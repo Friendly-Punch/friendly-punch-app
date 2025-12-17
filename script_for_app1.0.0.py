@@ -1,13 +1,14 @@
 import streamlit as st
 import pandas as pd
+import matplotlib.pyplot as plt
 
-st.title("資産形成シミュレーション（昇給率オプション対応）")
+st.title("資産形成シミュレーション（昇給率オプション＋イベントマーカー対応）")
 
 # 基本情報
 start_age = st.number_input("開始年齢", min_value=18, max_value=80, value=30)
 goal_age = st.number_input("目標年齢", min_value=start_age+1, max_value=100, value=65)
 base_salary = st.number_input("月給（円）", min_value=50000, step=10000, value=300000)
-bonus_multiplier = st.slider("ボーナス倍率（何か月分）", 0.0, 6.0, 2.5)  # 月給の何か月分か
+bonus_multiplier = st.slider("ボーナス倍率（何か月分）", 0.0, 6.0, 2.5)
 rate = st.slider("運用利回り（年率 %）", 0.0, 10.0, 5.0)
 
 r_month = rate / 100 / 12
@@ -164,12 +165,32 @@ if st.button("シミュレーション開始！"):
         "イベント名": event_names
     })
 
-    # グラフ表示
-    st.subheader("年齢ごとの資産推移")
-    st.line_chart(df.set_index("年齢")[["運用資産", "現金資産", "合計資産"]])
+    # グラフと表をタブで分ける
+    tab1, tab2 = st.tabs(["📈 グラフ表示", "📊 表表示"])
 
-    # 表を任意表示
-    if st.checkbox("年齢ごとの資産表を表示する"):
+    with tab1:
+        st.subheader("年齢ごとの資産推移")
+
+        # Matplotlibでイベントマーカー付きグラフを描画
+        fig, ax = plt.subplots()
+        ax.plot(df["年齢"], df["運用資産"], label="運用資産")
+        ax.plot(df["年齢"], df["現金資産"], label="現金資産")
+        ax.plot(df["年齢"], df["合計資産"], label="合計資産")
+
+        # イベント発生年齢にマーカーを追加
+        for i, row in df.iterrows():
+            if row["イベント支出"] > 0:
+                ax.scatter(row["年齢"], row["合計資産"], color="red", marker="o")
+                ax.text(row["年齢"], row["合計資産"], row["イベント名"],
+                        fontsize=8, rotation=45, ha="right", va="bottom")
+
+        ax.set_xlabel("年齢")
+        ax.set_ylabel("資産額（円）")
+        ax.legend()
+        st.pyplot(fig)
+
+    with tab2:
+        st.subheader("年齢ごとの資産表")
         st.dataframe(df.style.format({
             "運用資産": "{:,.0f}", 
             "現金資産": "{:,.0f}", 

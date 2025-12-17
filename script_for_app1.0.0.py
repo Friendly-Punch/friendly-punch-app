@@ -1,11 +1,11 @@
 import streamlit as st
 import pandas as pd
 
-st.title("資産形成シミュレーション（ライフイベント＋振り分け2択対応）")
+st.title("資産形成シミュレーション（選択式ライフイベント対応）")
 
 # 基本情報
 start_age = st.number_input("開始年齢", min_value=18, max_value=80, value=30)
-goal_age = st.number_input("目標年齢（例：65歳）", min_value=start_age+1, max_value=100, value=65)
+goal_age = st.number_input("目標年齢", min_value=start_age+1, max_value=100, value=65)
 income = st.number_input("月々の手取り額（円）", min_value=50000, step=10000, value=300000)
 rate = st.slider("運用利回り（年率 %）", 0.0, 10.0, 5.0)
 
@@ -26,21 +26,40 @@ allocation_mode = st.radio(
     "余剰資金の振り分け方法",
     ["常に一定割合", "参考モデル（100 - 年齢）%"]
 )
-
 if allocation_mode == "常に一定割合":
     fixed_ratio_invest = st.slider("余剰資金の運用割合（%）", 0, 100, 50)
 
-# 複数イベント入力
+# -------------------------
+# ライフイベント選択肢
+# -------------------------
 st.subheader("ライフイベント設定")
-event_count = st.number_input("イベント数", min_value=0, max_value=10, value=2)
-
 events = []
-for i in range(event_count):
-    st.markdown(f"### イベント {i+1}")
-    name = st.text_input(f"イベント名 {i+1}", f"イベント{i+1}")
-    age = st.number_input(f"発生年齢 {i+1}", min_value=start_age+1, max_value=goal_age, value=start_age+10+i)
-    cost = st.number_input(f"支出額 {i+1}（円）", min_value=100000, step=100000, value=1000000*(i+1))
-    events.append({"name": name, "age": age, "cost": cost})
+
+if st.checkbox("教育費（子どもの大学進学など）"):
+    edu_age = st.number_input("教育費発生年齢", min_value=start_age+1, max_value=goal_age, value=start_age+20)
+    edu_cost = st.number_input("教育費支出額（円）", min_value=100000, step=100000, value=3000000)
+    events.append({"name": "教育費", "age": edu_age, "cost": edu_cost})
+
+if st.checkbox("住宅購入"):
+    house_age = st.number_input("住宅購入年齢", min_value=start_age+1, max_value=goal_age, value=start_age+10)
+    house_cost = st.number_input("住宅購入費用（円）", min_value=1000000, step=1000000, value=30000000)
+    events.append({"name": "住宅購入", "age": house_age, "cost": house_cost})
+
+if st.checkbox("車購入"):
+    car_age = st.number_input("車購入年齢", min_value=start_age+1, max_value=goal_age, value=start_age+5)
+    car_cost = st.number_input("車購入費用（円）", min_value=100000, step=100000, value=3000000)
+    events.append({"name": "車購入", "age": car_age, "cost": car_cost})
+
+if st.checkbox("結婚"):
+    marriage_age = st.number_input("結婚年齢", min_value=start_age+1, max_value=goal_age, value=start_age+8)
+    marriage_cost = st.number_input("結婚費用（円）", min_value=100000, step=100000, value=5000000)
+    events.append({"name": "結婚", "age": marriage_age, "cost": marriage_cost})
+
+if st.checkbox("その他イベント"):
+    other_name = st.text_input("イベント名", "旅行")
+    other_age = st.number_input("イベント発生年齢", min_value=start_age+1, max_value=goal_age, value=start_age+15)
+    other_cost = st.number_input("イベント支出額（円）", min_value=100000, step=100000, value=1000000)
+    events.append({"name": other_name, "age": other_age, "cost": other_cost})
 
 # -------------------------
 # シミュレーション開始ボタン

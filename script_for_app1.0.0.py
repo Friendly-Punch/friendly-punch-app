@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 
-st.title("資産形成シミュレーション（振り分け2択対応）")
+st.title("資産形成シミュレーション（ライフイベント＋振り分け2択対応）")
 
 # 基本情報
 start_age = st.number_input("開始年齢", min_value=18, max_value=80, value=30)
@@ -30,12 +30,24 @@ allocation_mode = st.radio(
 if allocation_mode == "常に一定割合":
     fixed_ratio_invest = st.slider("余剰資金の運用割合（%）", 0, 100, 50)
 
+# 複数イベント入力
+st.subheader("ライフイベント設定")
+event_count = st.number_input("イベント数", min_value=0, max_value=10, value=2)
+
+events = []
+for i in range(event_count):
+    st.markdown(f"### イベント {i+1}")
+    name = st.text_input(f"イベント名 {i+1}", f"イベント{i+1}")
+    age = st.number_input(f"発生年齢 {i+1}", min_value=start_age+1, max_value=goal_age, value=start_age+10+i)
+    cost = st.number_input(f"支出額 {i+1}（円）", min_value=100000, step=100000, value=1000000*(i+1))
+    events.append({"name": name, "age": age, "cost": cost})
+
 # -------------------------
 # シミュレーション開始ボタン
 # -------------------------
 if st.button("シミュレーション開始！"):
     ages = list(range(start_age + 1, goal_age + 1))
-    invest_values, cash_values, total_values = [], [], []
+    invest_values, cash_values, total_values, event_spending, event_names = [], [], [], [], []
     value_invest, value_cash = 0.0, 0.0
 
     for age in ages:
@@ -64,15 +76,32 @@ if st.button("シミュレーション開始！"):
         # 現金資産（単純加算）
         value_cash += cash_amount * 12
 
+        # ライフイベント発生
+        spent, ev_name = 0, ""
+        for ev in events:
+            if age == ev["age"]:
+                spent = ev["cost"]
+                ev_name = ev["name"]
+                if value_cash >= spent:
+                    value_cash -= spent
+                else:
+                    deficit = spent - value_cash
+                    value_cash = 0
+                    value_invest -= deficit
+
         invest_values.append(value_invest)
         cash_values.append(value_cash)
         total_values.append(value_invest + value_cash)
+        event_spending.append(spent)
+        event_names.append(ev_name)
 
     df = pd.DataFrame({
         "年齢": ages,
         "運用資産": invest_values,
         "現金資産": cash_values,
-        "合計資産": total_values
+        "合計資産": total_values,
+        "イベント支出": event_spending,
+        "イベント名": event_names
     })
 
     # グラフ表示
@@ -84,5 +113,6 @@ if st.button("シミュレーション開始！"):
         st.dataframe(df.style.format({
             "運用資産": "{:,.0f}", 
             "現金資産": "{:,.0f}", 
-            "合計資産": "{:,.0f}"
+            "合計資産": "{:,.0f}", 
+            "イベント支出": "{:,.0f}"
         }))

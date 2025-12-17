@@ -1,17 +1,18 @@
 import streamlit as st
 import pandas as pd
 
-st.title("資産形成シミュレーション（選択式ライフイベント対応）")
+st.title("資産形成シミュレーション（昇給率オプション対応）")
 
 # 基本情報
 start_age = st.number_input("開始年齢", min_value=18, max_value=80, value=30)
 goal_age = st.number_input("目標年齢", min_value=start_age+1, max_value=100, value=65)
-income = st.number_input("月々の手取り額（円）", min_value=50000, step=10000, value=300000)
+base_salary = st.number_input("月給（円）", min_value=50000, step=10000, value=300000)
+bonus_multiplier = st.slider("ボーナス倍率（何か月分）", 0.0, 6.0, 2.5)  # 月給の何か月分か
 rate = st.slider("運用利回り（年率 %）", 0.0, 10.0, 5.0)
 
 r_month = rate / 100 / 12
 
-# 支出内訳（簡易版）
+# 支出内訳
 housing = st.number_input("住居費（円）", 0, step=1000, value=60000)
 food = st.number_input("食費（円）", 0, step=1000, value=40000)
 other = st.number_input("その他生活費（円）", 0, step=1000, value=50000)
@@ -29,12 +30,41 @@ allocation_mode = st.radio(
 if allocation_mode == "常に一定割合":
     fixed_ratio_invest = st.slider("余剰資金の運用割合（%）", 0, 100, 50)
 
-# -------------------------
+# 昇給率モード選択
+salary_mode = st.radio(
+    "昇給率の設定方法",
+    ["デフォルトモデル（年齢ごとに自動設定）", "カスタム設定"]
+)
+
+# デフォルトモデル
+def default_salary_growth(age):
+    if age < 35:
+        return 0.03
+    elif age < 50:
+        return 0.015
+    else:
+        return 0.005
+
+# カスタム設定
+if salary_mode == "カスタム設定":
+    growth_20s = st.number_input("20代の昇給率（%）", 0.0, 10.0, 2.0)
+    growth_30s = st.number_input("30代の昇給率（%）", 0.0, 10.0, 1.5)
+    growth_40s = st.number_input("40代の昇給率（%）", 0.0, 10.0, 1.0)
+    growth_50s = st.number_input("50代以降の昇給率（%）", 0.0, 10.0, 0.5)
+
+    def custom_salary_growth(age):
+        if age < 30:
+            return growth_20s / 100
+        elif age < 40:
+            return growth_30s / 100
+        elif age < 50:
+            return growth_40s / 100
+        else:
+            return growth_50s / 100
+
 # ライフイベント選択肢
-# -------------------------
 st.subheader("ライフイベント設定")
 events = []
-
 if st.checkbox("教育費（子どもの大学進学など）"):
     edu_age = st.number_input("教育費発生年齢", min_value=start_age+1, max_value=goal_age, value=start_age+20)
     edu_cost = st.number_input("教育費支出額（円）", min_value=100000, step=100000, value=3000000)
@@ -68,15 +98,26 @@ if st.button("シミュレーション開始！"):
     ages = list(range(start_age + 1, goal_age + 1))
     invest_values, cash_values, total_values, event_spending, event_names = [], [], [], [], []
     value_invest, value_cash = 0.0, 0.0
+    current_salary = base_salary
 
     for age in ages:
+        # 昇給率の適用
+        if salary_mode == "デフォルトモデル（年齢ごとに自動設定）":
+            current_salary *= (1 + default_salary_growth(age))
+        else:
+            current_salary *= (1 + custom_salary_growth(age))
+
+        # 年収（給与＋ボーナス）
+        annual_bonus = current_salary * bonus_multiplier * 2
+        annual_income = current_salary * 12 + annual_bonus
+
         # 支出更新
         housing *= (1 + housing_growth/100)
         food *= (1 + food_growth/100)
         other *= (1 + other_growth/100)
-
         expenses_total = housing + food + other
-        surplus = income - expenses_total
+
+        surplus = annual_income - expenses_total
 
         # 振り分け計算
         if allocation_mode == "常に一定割合":
@@ -90,10 +131,10 @@ if st.button("シミュレーション開始！"):
 
         # 運用資産（複利）
         for _ in range(12):
-            value_invest = value_invest * (1 + r_month) + invest_amount
+            value_invest = value_invest * (1 + r_month) + invest_amount/12
 
         # 現金資産（単純加算）
-        value_cash += cash_amount * 12
+        value_cash += cash_amount
 
         # ライフイベント発生
         spent, ev_name = 0, ""

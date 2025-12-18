@@ -1,17 +1,7 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
-from matplotlib import font_manager, rcParams
-import matplotlib.ticker as mticker
 
-# ← ここでフォント設定をする
-rcParams['axes.unicode_minus'] = False
-# plt.rcParams['font.family'] = 'IPAexGothic'
-# 環境にIPAexGothicがない場合は Noto Sans CJK JP に切り替え
-plt.rcParams['font.family'] = 'Noto Sans CJK JP'
-
-
-st.title("資産形成シミュレーション（昇給率オプション＋イベントマーカー対応）")
+st.title("資産形成シミュレーション（昇給率オプション対応）")
 
 # 基本情報
 start_age = st.number_input("開始年齢", min_value=18, max_value=80, value=30)
@@ -174,39 +164,15 @@ if st.button("シミュレーション開始！"):
         "イベント名": event_names
     })
 
-    # グラフと表をタブで分ける
-    tab1, tab2 = st.tabs(["📈 グラフ表示", "📊 表表示"])
+    # グラフ表示（シンプルな line_chart）
+    st.subheader("年齢ごとの資産推移")
+    st.line_chart(df.set_index("年齢")[["運用資産", "現金資産", "合計資産"]])
 
-    with tab1:
-        st.subheader("年齢ごとの資産推移")
-
-        import matplotlib.ticker as mticker
-        fig, ax = plt.subplots()
-
-        # 折れ線
-        ax.plot(df["年齢"], df["運用資産"], label="運用資産")
-        ax.plot(df["年齢"], df["現金資産"], label="現金資産")
-    ax.plot(df["年齢"], df["合計資産"], label="合計資産")
-
-    # 軸ラベル
-    ax.set_xlabel("年齢")
-    ax.set_ylabel("資産額（円）")
-
-    # y軸のフォーマット（カンマ＋円）
-    ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, pos: f"{x:,.0f} 円"))
-
-    # グリッドと凡例
-    ax.grid(True, linestyle="--", alpha=0.3)
-    ax.legend()
-
-    st.pyplot(fig)
-
-
-    with tab2:
-        st.subheader("年齢ごとの資産表")
+    # 表をオプションで表示
+    if st.checkbox("年齢ごとの資産表を表示する"):
         st.dataframe(df.style.format({
-            "運用資産": "{:,.0f}", 
-            "現金資産": "{:,.0f}", 
-            "合計資産": "{:,.0f}", 
+            "運用資産": "{:,.0f}",
+            "現金資産": "{:,.0f}",
+            "合計資産": "{:,.0f}",
             "イベント支出": "{:,.0f}"
         }))

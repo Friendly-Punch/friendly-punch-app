@@ -1,181 +1,121 @@
 import streamlit as st
-import pandas as pd
+import random
+import matplotlib.pyplot as plt
 
-st.title("資産形成シミュレーション（昇給率オプション対応）")
+# -----------------------------
+# 初期設定
+# -----------------------------
+st.title("家計・資産運用シミュレーション（簡易版）")
 
-# 基本情報
-start_age = st.number_input("開始年齢", min_value=18, max_value=80, value=30)
-goal_age = st.number_input("目標年齢", min_value=start_age+1, max_value=100, value=65)
-base_salary = st.number_input("月給（円）", min_value=50000, step=10000, value=300000)
+start_age = st.number_input("開始年齢", 18, 80, 25)
+goal_age = st.number_input("終了年齢", start_age+1, 100, 65)
+current_salary = st.number_input("月給（手取り 円）", 0, step=10000, value=300000)
+
+# ボーナス設定
 bonus_multiplier = st.slider("ボーナス倍率（何か月分）", 0.0, 6.0, 2.5)
-rate = st.slider("運用利回り（年率 %）", 0.0, 10.0, 5.0)
+bonus_spend_ratio = st.slider("ボーナス支出割合（旅行・買い物など）", 0, 100, 30)
+bonus_cash_ratio = st.slider("ボーナス現金貯金割合", 0, 100, 40)
+bonus_invest_ratio = 100 - bonus_spend_ratio - bonus_cash_ratio
 
-r_month = rate / 100 / 12
+annual_bonus = current_salary * bonus_multiplier * 2
 
-# 支出内訳
-housing = st.number_input("住居費（円）", 0, step=1000, value=60000)
-food = st.number_input("食費（円）", 0, step=1000, value=40000)
-other = st.number_input("その他生活費（円）", 0, step=1000, value=50000)
+# -----------------------------
+# 支出カテゴリ
+# -----------------------------
+housing = st.number_input("住居費（月額 円）", 0, step=1000, value=80000)
+food = st.number_input("食費（月額 円）", 0, step=1000, value=60000)
 
-# 支出変動率
-housing_growth = st.slider("住居費の年間増減率（%）", -5.0, 5.0, 0.0)
-food_growth = st.slider("食費の年間増減率（%）", -5.0, 5.0, 1.0)
-other_growth = st.slider("その他生活費の年間増減率（%）", -5.0, 5.0, 0.0)
+utilities = st.number_input("水道光熱費（月額 円）", 0, step=1000, value=20000)
+comm = st.number_input("通信費（月額 円）", 0, step=1000, value=12000)
+transport = st.number_input("交通費（月額 円）", 0, step=1000, value=20000)
+insurance = st.number_input("保険料（月額 円）", 0, step=1000, value=30000)
+misc = st.number_input("その他雑費（月額 円）", 0, step=1000, value=50000)
 
-# 振り分けモード選択
-allocation_mode = st.radio(
-    "余剰資金の振り分け方法",
-    ["常に一定割合", "参考モデル（100 - 年齢）%"]
-)
-if allocation_mode == "常に一定割合":
-    fixed_ratio_invest = st.slider("余剰資金の運用割合（%）", 0, 100, 50)
+# -----------------------------
+# 投資・余力振り分け設定
+# -----------------------------
+allocation_mode = st.radio("余力の振り分け方法", ["デフォルト固定割合", "100-年齢ルール", "個人設定"])
 
-# 昇給率モード選択
-salary_mode = st.radio(
-    "昇給率の設定方法",
-    ["デフォルトモデル（年齢ごとに自動設定）", "カスタム設定"]
-)
+if allocation_mode == "デフォルト固定割合":
+    invest_ratio = 50
+    cash_ratio = 50
+elif allocation_mode == "100-年齢ルール":
+    invest_ratio = max(0, 100 - start_age)
+    cash_ratio = 100 - invest_ratio
+elif allocation_mode == "個人設定":
+    invest_ratio = st.slider("投資割合（%）", 0, 100, 50)
+    cash_ratio = 100 - invest_ratio
 
-# デフォルトモデル
-def default_salary_growth(age):
-    if age < 35:
-        return 0.03
-    elif age < 50:
-        return 0.015
-    else:
-        return 0.005
+cash_rate = st.slider("預金利息（年率 %）", 0.0, 1.0, 0.01)
 
-# カスタム設定
-if salary_mode == "カスタム設定":
-    growth_20s = st.number_input("20代の昇給率（%）", 0.0, 10.0, 2.0)
-    growth_30s = st.number_input("30代の昇給率（%）", 0.0, 10.0, 1.5)
-    growth_40s = st.number_input("40代の昇給率（%）", 0.0, 10.0, 1.0)
-    growth_50s = st.number_input("50代以降の昇給率（%）", 0.0, 10.0, 0.5)
+scenario = st.radio("投資シナリオ", ["ランダム変動", "強気", "弱気"])
+if scenario == "ランダム変動":
+    avg_invest_rate = st.slider("平均投資利回り（年率 %）", -10.0, 20.0, 3.0)
+    volatility = st.slider("変動幅（年率 %）", 0.0, 20.0, 5.0)
+elif scenario == "強気":
+    avg_invest_rate = 6.0
+    volatility = 3.0
+elif scenario == "弱気":
+    avg_invest_rate = 1.0
+    volatility = 8.0
 
-    def custom_salary_growth(age):
-        if age < 30:
-            return growth_20s / 100
-        elif age < 40:
-            return growth_30s / 100
-        elif age < 50:
-            return growth_40s / 100
-        else:
-            return growth_50s / 100
+# -----------------------------
+# シミュレーション本体
+# -----------------------------
+value_cash = 0
+value_invest = 0
+history_cash = []
+history_invest = []
+history_total = []
+ages = []
 
-# ライフイベント選択肢
-st.subheader("ライフイベント設定")
-events = []
-if st.checkbox("教育費（子どもの大学進学など）"):
-    edu_age = st.number_input("教育費発生年齢", min_value=start_age+1, max_value=goal_age, value=start_age+20)
-    edu_cost = st.number_input("教育費支出額（円）", min_value=100000, step=100000, value=3000000)
-    events.append({"name": "教育費", "age": edu_age, "cost": edu_cost})
+for age in range(start_age, goal_age+1):
+    for month in range(12):
+        # 月収入
+        monthly_income = current_salary
+        
+        # 月支出
+        monthly_expenses = housing + food + utilities + comm + transport + insurance + misc
+        
+        # 余力
+        surplus = monthly_income - monthly_expenses
+        
+        # 投資利回り（ランダム）
+        rand_factor = random.uniform(-1, 1)
+        monthly_rate = (avg_invest_rate + rand_factor * volatility) / 100 / 12
+        
+        # 資産更新
+        value_cash = value_cash * (1 + cash_rate/100/12) + surplus * cash_ratio/100
+        value_invest = value_invest * (1 + monthly_rate) + surplus * invest_ratio/100
+        
+        # ボーナス処理（仮に6月と12月）
+        if month in [5, 11]:
+            bonus_spend = annual_bonus/2 * bonus_spend_ratio/100
+            bonus_cash = annual_bonus/2 * bonus_cash_ratio/100
+            bonus_invest = annual_bonus/2 * bonus_invest_ratio/100
+            
+            if value_cash >= bonus_spend:
+                value_cash -= bonus_spend
+            else:
+                value_cash = 0  # 足りなければゼロ
+            
+            value_cash += bonus_cash
+            value_invest = value_invest * (1 + monthly_rate) + bonus_invest
+    
+    # 年末記録
+    history_cash.append(value_cash)
+    history_invest.append(value_invest)
+    history_total.append(value_cash + value_invest)
+    ages.append(age)
 
-if st.checkbox("住宅購入"):
-    house_age = st.number_input("住宅購入年齢", min_value=start_age+1, max_value=goal_age, value=start_age+10)
-    house_cost = st.number_input("住宅購入費用（円）", min_value=1000000, step=1000000, value=30000000)
-    events.append({"name": "住宅購入", "age": house_age, "cost": house_cost})
-
-if st.checkbox("車購入"):
-    car_age = st.number_input("車購入年齢", min_value=start_age+1, max_value=goal_age, value=start_age+5)
-    car_cost = st.number_input("車購入費用（円）", min_value=100000, step=100000, value=3000000)
-    events.append({"name": "車購入", "age": car_age, "cost": car_cost})
-
-if st.checkbox("結婚"):
-    marriage_age = st.number_input("結婚年齢", min_value=start_age+1, max_value=goal_age, value=start_age+8)
-    marriage_cost = st.number_input("結婚費用（円）", min_value=100000, step=100000, value=5000000)
-    events.append({"name": "結婚", "age": marriage_age, "cost": marriage_cost})
-
-if st.checkbox("その他イベント"):
-    other_name = st.text_input("イベント名", "旅行")
-    other_age = st.number_input("イベント発生年齢", min_value=start_age+1, max_value=goal_age, value=start_age+15)
-    other_cost = st.number_input("イベント支出額（円）", min_value=100000, step=100000, value=1000000)
-    events.append({"name": other_name, "age": other_age, "cost": other_cost})
-
-# -------------------------
-# シミュレーション開始ボタン
-# -------------------------
-if st.button("シミュレーション開始！"):
-    ages = list(range(start_age + 1, goal_age + 1))
-    invest_values, cash_values, total_values, event_spending, event_names = [], [], [], [], []
-    value_invest, value_cash = 0.0, 0.0
-    current_salary = base_salary
-
-    for age in ages:
-        # 昇給率の適用
-        if salary_mode == "デフォルトモデル（年齢ごとに自動設定）":
-            current_salary *= (1 + default_salary_growth(age))
-        else:
-            current_salary *= (1 + custom_salary_growth(age))
-
-        # 年収（給与＋ボーナス）
-        annual_bonus = current_salary * bonus_multiplier * 2
-        annual_income = current_salary * 12 + annual_bonus
-
-        # 支出更新
-        housing *= (1 + housing_growth/100)
-        food *= (1 + food_growth/100)
-        other *= (1 + other_growth/100)
-        expenses_total = housing + food + other
-
-        surplus = annual_income - expenses_total
-
-        # 振り分け計算
-        if allocation_mode == "常に一定割合":
-            invest_amount = surplus * fixed_ratio_invest / 100
-            cash_amount = surplus * (100 - fixed_ratio_invest) / 100
-        else:
-            invest_ratio = max(0, 100 - age)
-            cash_ratio = 100 - invest_ratio
-            invest_amount = surplus * invest_ratio / 100
-            cash_amount = surplus * cash_ratio / 100
-
-        # 運用資産（複利）
-        for _ in range(12):
-            value_invest = value_invest * (1 + r_month) + invest_amount/12
-
-        # 現金資産（単純加算）
-        value_cash += cash_amount
-
-        # ライフイベント発生
-        spent, ev_name = 0, ""
-        for ev in events:
-            if age == ev["age"]:
-                spent = ev["cost"]
-                ev_name = ev["name"]
-                if value_cash >= spent:
-                    value_cash -= spent
-                else:
-                    deficit = spent - value_cash
-                    value_cash = 0
-                    value_invest -= deficit
-
-        invest_values.append(value_invest)
-        cash_values.append(value_cash)
-        total_values.append(value_invest + value_cash)
-        event_spending.append(spent)
-        event_names.append(ev_name)
-
-    df = pd.DataFrame({
-        "年齢": ages,
-        "運用資産": invest_values,
-        "現金資産": cash_values,
-        "合計資産": total_values,
-        "イベント支出": event_spending,
-        "イベント名": event_names
-    })
-
-    # df を作成済みのあとに追加
-    tab1, tab2 = st.tabs(["📈 グラフ表示", "📊 表表示"])
-
-    with tab1:
-      st.subheader("年齢ごとの資産推移")
-      st.line_chart(df.set_index("年齢")[["運用資産", "現金資産", "合計資産"]])
-
-    with tab2:
-      st.subheader("年齢ごとの資産表")
-      st.dataframe(df.style.format({
-        "運用資産": "{:,.0f}",
-        "現金資産": "{:,.0f}",
-        "合計資産": "{:,.0f}",
-        "イベント支出": "{:,.0f}"
-     }))
+# -----------------------------
+# グラフ描画
+# -----------------------------
+fig, ax = plt.subplots(figsize=(10,6))
+ax.plot(ages, history_cash, label="現金資産", color="blue")
+ax.plot(ages, history_invest, label="投資資産", color="green")
+ax.plot(ages, history_total, label="総資産", color="red")
+ax.set_xlabel("年齢")
+ax.set_ylabel("資産額（円）")
+ax.legend()
+st.pyplot(fig)

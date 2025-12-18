@@ -6,9 +6,9 @@ import matplotlib.ticker as mticker
 
 # ← ここでフォント設定をする
 rcParams['axes.unicode_minus'] = False
-plt.rcParams['font.family'] = 'IPAexGothic'
+# plt.rcParams['font.family'] = 'IPAexGothic'
 # 環境にIPAexGothicがない場合は Noto Sans CJK JP に切り替え
-# plt.rcParams['font.family'] = 'Noto Sans CJK JP'
+plt.rcParams['font.family'] = 'Noto Sans CJK JP'
 
 
 st.title("資産形成シミュレーション（昇給率オプション＋イベントマーカー対応）")

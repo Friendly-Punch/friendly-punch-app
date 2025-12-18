@@ -1,6 +1,15 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib import font_manager, rcParams
+import matplotlib.ticker as mticker
+
+# ← ここでフォント設定をする
+rcParams['axes.unicode_minus'] = False
+plt.rcParams['font.family'] = 'IPAexGothic'
+# 環境にIPAexGothicがない場合は Noto Sans CJK JP に切り替え
+# plt.rcParams['font.family'] = 'Noto Sans CJK JP'
+
 
 st.title("資産形成シミュレーション（昇給率オプション＋イベントマーカー対応）")
 
@@ -171,23 +180,27 @@ if st.button("シミュレーション開始！"):
     with tab1:
         st.subheader("年齢ごとの資産推移")
 
-        # Matplotlibでイベントマーカー付きグラフを描画
+        import matplotlib.ticker as mticker
         fig, ax = plt.subplots()
+
+        # 折れ線
         ax.plot(df["年齢"], df["運用資産"], label="運用資産")
         ax.plot(df["年齢"], df["現金資産"], label="現金資産")
-        ax.plot(df["年齢"], df["合計資産"], label="合計資産")
+    ax.plot(df["年齢"], df["合計資産"], label="合計資産")
 
-        # イベント発生年齢にマーカーを追加
-        for i, row in df.iterrows():
-            if row["イベント支出"] > 0:
-                ax.scatter(row["年齢"], row["合計資産"], color="red", marker="o")
-                ax.text(row["年齢"], row["合計資産"], row["イベント名"],
-                        fontsize=8, rotation=45, ha="right", va="bottom")
+    # 軸ラベル
+    ax.set_xlabel("年齢")
+    ax.set_ylabel("資産額（円）")
 
-        ax.set_xlabel("年齢")
-        ax.set_ylabel("資産額（円）")
-        ax.legend()
-        st.pyplot(fig)
+    # y軸のフォーマット（カンマ＋円）
+    ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, pos: f"{x:,.0f} 円"))
+
+    # グリッドと凡例
+    ax.grid(True, linestyle="--", alpha=0.3)
+    ax.legend()
+
+    st.pyplot(fig)
+
 
     with tab2:
         st.subheader("年齢ごとの資産表")

@@ -1,6 +1,9 @@
 import streamlit as st
 import matplotlib.pyplot as plt
 import random
+import matplotlib
+
+matplotlib.rcParams['font.family'] = 'Meiryo'
 
 st.header("💰 収入設定")
 start_age = st.number_input("開始年齢", 18, 80, 25)

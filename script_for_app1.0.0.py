@@ -1,4 +1,78 @@
 import streamlit as st
+import matplotlib.pyplot as plt
+import random
+
+st.header("💰 収入設定")
+start_age = st.number_input("開始年齢", 18, 80, 25)
+goal_age = st.number_input("終了年齢", start_age+1, 100, 65)
+current_salary = st.number_input("月給（手取り 円）", 0, step=10000, value=300000)
+
+bonus_multiplier = st.slider("ボーナス倍率（何か月分）", 0.0, 6.0, 2.5)
+bonus_spend_ratio = st.slider("ボーナス支出割合（%）", 0, 100, 30)
+bonus_cash_ratio = st.slider("ボーナス現金貯金割合（%）", 0, 100, 40)
+bonus_invest_ratio = 100 - bonus_spend_ratio - bonus_cash_ratio
+annual_bonus = current_salary * bonus_multiplier * 2
+
+st.header("📦 固定支出設定")
+
+housing = st.number_input("住居費（月額 円）", 0, step=1000, value=80000)
+food = st.number_input("食費（月額 円）", 0, step=1000, value=60000)
+
+utilities_base = st.number_input("水道光熱費（月額 円）", 0, step=1000, value=20000)
+utilities_growth = st.slider("水道光熱費 年間増減率（%）", -5.0, 10.0, 1.5)
+
+comm_base = st.number_input("通信費（月額 円）", 0, step=1000, value=12000)
+comm_growth = st.slider("通信費 年間増減率（%）", -5.0, 10.0, 1.0)
+
+transport_base = st.number_input("交通費（月額 円）", 0, step=1000, value=20000)
+transport_growth = st.slider("交通費 年間増減率（%）", -5.0, 10.0, 1.5)
+
+insurance_base = st.number_input("保険料（月額 円）", 0, step=1000, value=30000)
+insurance_growth = st.slider("保険料 年間増減率（%）", -5.0, 10.0, 1.0)
+
+misc_base = st.number_input("その他雑費（月額 円）", 0, step=1000, value=50000)
+misc_growth = st.slider("その他雑費 年間増減率（%）", -5.0, 10.0, 1.0)
+
+st.header("📈 投資設定")
+
+allocation_mode = st.radio("余力の振り分け方法", ["デフォルト固定割合", "100-年齢ルール", "個人設定"])
+
+if allocation_mode == "デフォルト固定割合":
+    invest_ratio = 50
+    cash_ratio = 50
+elif allocation_mode == "100-年齢ルール":
+    invest_ratio = max(0, 100 - start_age)
+    cash_ratio = 100 - invest_ratio
+elif allocation_mode == "個人設定":
+    invest_ratio = st.slider("投資割合（%）", 0, 100, 50)
+    cash_ratio = 100 - invest_ratio
+
+cash_rate = st.slider("預金利息（年率 %）", 0.0, 1.0, 0.01)
+
+scenario = st.radio("投資シナリオ", ["ランダム変動", "強気", "弱気"])
+if scenario == "ランダム変動":
+    avg_invest_rate = st.slider("平均投資利回り（年率 %）", -10.0, 20.0, 3.0)
+    volatility = st.slider("変動幅（年率 %）", 0.0, 20.0, 5.0)
+elif scenario == "強気":
+    avg_invest_rate = 6.0
+    volatility = 3.0
+elif scenario == "弱気":
+    avg_invest_rate = 1.0
+    volatility = 8.0
+
+def expense_with_growth(base: float, growth: float, years: int) -> float:
+    """
+    年間増減率を反映して、指定年数後の支出額を計算する関数。
+
+    Parameters:
+    - base: 初年度の支出額（円）
+    - growth: 年間増減率（%）
+    - years: 開始からの経過年数
+
+    Returns:
+    - 増加後の支出額（float）
+    """
+    return base * ((1 + growth / 100) ** years)
 
 st.title("ライフイベント設定（人生の順番で入力）")
 
@@ -46,54 +120,109 @@ house_cost = st.number_input("住宅購入費用（円）", min_value=1000000, s
 house_down_payment_ratio = 0.2  # デフォルト20%
 
 st.write(f"頭金はデフォルトで {house_down_payment_ratio*100:.0f}% に設定されています。")
-import streamlit as st
 
-st.title("ライフイベント設定（人生の順番で入力）")
+# ----------------------------------------
+# Step 2：イベントリスト生成
+# ----------------------------------------
+
+events = []
 
 # -----------------------------
-# 車購入（5年ごとに買い替え）
+# 車購入（5年ごと）
 # -----------------------------
-st.header("🚗 車購入")
-car_first_age = st.number_input("最初の車購入年齢", min_value=18, max_value=100, value=30, key="car_age_input")
-car_cost = st.number_input("車購入費用（円）", min_value=100000, step=100000, value=3000000, key="car_cost_input")
+age = car_first_age
+while age <= goal_age:
+    events.append({
+        "type": "car",
+        "age": age,
+        "cost": car_cost,
+        "loan": True,
+        "loan_years": 5
+    })
+    age += 5
 
 # -----------------------------
 # 結婚
 # -----------------------------
-st.header("💍 結婚")
-marriage_age = st.number_input("結婚年齢", min_value=18, max_value=100, value=28)
-marriage_cost = st.number_input("結婚費用（円）", min_value=100000, step=100000, value=2000000)
+events.append({
+    "type": "marriage",
+    "age": marriage_age,
+    "cost": marriage_cost,
+    "loan": True,
+    "loan_years": 5
+})
 
 # -----------------------------
-# 子ども（人数可変）
+# 子ども（人数分）
 # -----------------------------
-st.header("👶 子ども")
-num_children = st.number_input("子どもの人数", 0, 5, 0)
+for i, child in enumerate(children):
+    birth_age = child["birth_age"]
 
-children = []
+    # 出産イベント（費用なし）
+    events.append({
+        "type": "birth",
+        "age": birth_age,
+        "cost": 0,
+        "loan": False
+    })
 
-for i in range(num_children):
-    st.subheader(f"{i+1}人目の子ども")
-    birth_age = st.number_input(f"{i+1}人目の出産年齢", min_value=18, max_value=100, value=30+i*3)
+    # 小→中（12歳）
+    events.append({
+        "type": "edu_small_to_junior",
+        "age": birth_age + 12,
+        "cost": 200000,
+        "loan": False
+    })
 
-    # 教育イベントは後で自動生成するので、ここでは birth_age だけ保持
-    children.append({"birth_age": birth_age})
+    # 中→高（15歳）
+    events.append({
+        "type": "edu_junior_to_high",
+        "age": birth_age + 15,
+        "cost": 200000,
+        "loan": False
+    })
+
+    # 高→大（18歳）
+    events.append({
+        "type": "edu_high_to_univ",
+        "age": birth_age + 18,
+        "cost": 500000,
+        "loan": True,
+        "loan_years": 10
+    })
+
+    # 大学学費（18〜21歳の4年間）
+    for y in range(4):
+        events.append({
+            "type": "univ_tuition",
+            "age": birth_age + 18 + y,
+            "cost": 600000,
+            "loan": True,
+            "loan_years": 10
+        })
 
 # -----------------------------
-# 教育費（固定ロジック）
+# 住宅購入（頭金20%）
 # -----------------------------
-st.header("🎒 教育費（固定）")
-st.write("小→中：20万円、中→高：20万円、高→大：50万円、大学学費：年60万円（4年間）")
+events.append({
+    "type": "house",
+    "age": house_age,
+    "cost": house_cost,
+    "down_payment_ratio": house_down_payment_ratio,
+    "loan": True,
+    "loan_years": 30
+})
 
-# -----------------------------
-# 住宅購入
-# -----------------------------
-st.header("🏠 住宅購入")
-house_age = st.number_input("住宅購入年齢", min_value=18, max_value=100, value=35)
-house_cost = st.number_input("住宅購入費用（円）", min_value=1000000, step=1000000, value=30000000)
-house_down_payment_ratio = 0.2  # デフォルト20%
+# ----------------------------------------
+# イベントを年齢順にソート
+# ----------------------------------------
+events = sorted(events, key=lambda x: x["age"])
 
-st.write(f"頭金はデフォルトで {house_down_payment_ratio*100:.0f}% に設定されています。")
+# デバッグ表示（任意）
+st.subheader("生成されたイベント一覧（デバッグ用）")
+for e in events:
+    st.write(e)
+
 # ----------------------------------------
 # Step 3：メインループ（イベント処理・ローン積み上げ）
 # ----------------------------------------

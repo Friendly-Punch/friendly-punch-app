@@ -54,8 +54,8 @@ st.title("ライフイベント設定（人生の順番で入力）")
 # 車購入（5年ごとに買い替え）
 # -----------------------------
 st.header("🚗 車購入")
-car_first_age = st.number_input("最初の車購入年齢", min_value=18, max_value=100, value=30)
-car_cost = st.number_input("車購入費用（円）", min_value=100000, step=100000, value=3000000)
+car_first_age = st.number_input("最初の車購入年齢", min_value=18, max_value=100, value=30, key="car_age_input")
+car_cost = st.number_input("車購入費用（円）", min_value=100000, step=100000, value=3000000, key="car_cost_input")
 
 # -----------------------------
 # 結婚

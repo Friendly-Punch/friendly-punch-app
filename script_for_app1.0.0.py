@@ -74,6 +74,68 @@ def expense_with_growth(base: float, growth: float, years: int) -> float:
     """
     return base * ((1 + growth / 100) ** years)
 
+st.header("💼 業種選択（昇給カーブ）")
+
+industry = st.selectbox(
+    "あなたの業種を選んでください",
+    ["メーカー", "IT・Web", "公務員", "介護・福祉", "飲食・小売"]
+)
+def salary_growth_manufacturer(age):
+    if age < 30:
+        return 3.0
+    elif age < 45:
+        return 2.0
+    elif age < 55:
+        return 1.0
+    else:
+        return 0.5
+
+def salary_growth_it(age):
+    if age < 30:
+        return 5.0
+    elif age < 45:
+        return 3.0
+    elif age < 55:
+        return 1.5
+    else:
+        return 1.0
+
+def salary_growth_public(age):
+    if age < 40:
+        return 1.5
+    elif age < 55:
+        return 1.0
+    else:
+        return 0.5
+
+def salary_growth_care(age):
+    if age < 40:
+        return 1.0
+    elif age < 55:
+        return 0.8
+    else:
+        return 0.5
+
+def salary_growth_retail(age):
+    if age < 40:
+        return 1.0
+    elif age < 55:
+        return 0.5
+    else:
+        return 0.0
+def get_salary_growth(age, industry):
+    if industry == "メーカー":
+        return salary_growth_manufacturer(age)
+    elif industry == "IT・Web":
+        return salary_growth_it(age)
+    elif industry == "公務員":
+        return salary_growth_public(age)
+    elif industry == "介護・福祉":
+        return salary_growth_care(age)
+    elif industry == "飲食・小売":
+        return salary_growth_retail(age)
+    return 0
+
 st.title("ライフイベント設定（人生の順番で入力）")
 
 # -----------------------------
@@ -263,7 +325,8 @@ for age in range(start_age, goal_age + 1):
         # -----------------------------
         # 月収入 → 余力
         # -----------------------------
-        monthly_income = current_salary
+        growth_rate = get_salary_growth(age, industry)
+        monthly_income = current_salary * ((1 + growth_rate / 100) ** (age - start_age))
         surplus = monthly_income - monthly_expenses
 
         # -----------------------------

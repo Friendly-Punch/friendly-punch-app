@@ -2,6 +2,7 @@ import streamlit as st
 import matplotlib.pyplot as plt
 import random
 import matplotlib
+matplotlib.rcParams['font.family'] = 'Meiryo'
 
 matplotlib.rcParams['font.family'] = 'Meiryo'
 
